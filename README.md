@@ -2,7 +2,7 @@
 
 A URL shortening service with distributed rate limiting and click analytics, built with Java and Spring Boot.
 
-> **Status:** In development. Sections marked *TBD* are filled in as each phase is completed. Benchmark numbers are intentionally empty until they are measured.
+> **Status:** Phase 1 (walking skeleton) is code-complete and verified locally; live deployment is pending. Sections marked *TBD* are filled in as each phase is completed. Benchmark numbers are intentionally empty until they are measured.
 >
 > **This README is the canonical specification.** `projectDefnition.md` is the historical design brief and is kept for context only; if the two disagree, the README wins.
 
@@ -259,15 +259,39 @@ linkforge/
 
 ## 11. Getting Started
 
-*TBD: finalized once the Docker Compose file exists.* The target experience is:
+Requires **JDK 21** and **Docker**. The full one-command stack (`docker compose up` starting the app too) lands in Phase 8 with the Dockerfile; today the app runs from Maven against containerised data stores.
 
 ```bash
 git clone <repo-url>
 cd linkforge
-docker compose up
+
+docker compose up -d          # PostgreSQL 16 + Redis 7
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-This should start the app, PostgreSQL, Redis, Prometheus, and Grafana with no manual steps. The API will be at `http://localhost:8080` and Swagger UI at `http://localhost:8080/swagger-ui.html`.
+- API: `http://localhost:8080`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- Health: `http://localhost:8080/actuator/health`
+- Metrics: `http://localhost:8080/actuator/prometheus`
+
+The `local` profile seeds a development account: `dev@linkforge.local` / `devpassword`.
+It exists only under that profile; a deployed instance never gets a known password.
+
+A quick smoke test (requires `jq`):
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"dev@linkforge.local","password":"devpassword"}'
+# copy accessToken from the response, then:
+curl -i -X POST http://localhost:8080/api/v1/links \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com/products/phones?id=84729"}'
+# GET the returned code; it responds 302 with the destination in Location.
+```
+
+Integration tests use Testcontainers, so `./mvnw verify` needs Docker too (it starts its own Postgres and Redis). `./mvnw test` runs unit tests only and does not need Docker.
 
 ---
 
