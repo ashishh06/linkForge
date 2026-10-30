@@ -1,0 +1,105 @@
+spring:
+  application:
+    name: linkforge
+
+  # We authenticate with JWT only. Without this exclusion Boot creates an in-memory
+  # user and prints a generated password at every startup, which is noise.
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/linkforge}
+    username: ${DB_USER:linkforge}
+    password: ${DB_PASSWORD:linkforge}
+    hikari:
+      pool-name: linkforge-pool
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 2
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema; Hibernate only checks that the mappings match it.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        default_batch_fetch_size: 32
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 500ms
+      connect-timeout: 500ms
+
+  jackson:
+    time-zone: UTC
+    default-property-inclusion: non_null
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  # Client IPs are resolved by our own ClientIpResolver (trusted-proxy allowlist).
+  # Boot's "framework" strategy trusts every X-Forwarded-For and is therefore unsafe.
+  forward-headers-strategy: none
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    root: INFO
+    com.linkforge: INFO
+
+# Declared explicitly so springdoc does not warn about its defaults at startup.
+# Set SPRINGDOC_ENABLED=false on the production deployment if the docs should be private.
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:true}
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:true}
+
+linkforge:
+  base-url: ${BASE_URL:http://localhost:8080}
+  link:
+    code-length: 7
+    max-url-length: 2048
+    max-collision-retries: 5
+    reserved-aliases:
+      - api
+      - actuator
+      - admin
+      - login
+      - register
+      - swagger-ui
+      - v3
+      - error
+      - health
+      - favicon.ico
+  jwt:
+    issuer: ${JWT_ISSUER:linkforge}
+    # HS256 needs at least 32 bytes. The default keeps local runs and tests
+    # frictionless; a deployment must set JWT_SECRET (see .env.example).
+    secret: ${JWT_SECRET:dev-only-insecure-secret-change-me-before-deploying}
+    access-token-ttl: ${JWT_ACCESS_TTL:15m}
